@@ -1,0 +1,48 @@
+pipeline{
+    agent any
+    tools{
+        maven 'Maven'
+    }
+    stages{
+        stage('Git Checkout'){
+            steps{
+		// Please change repo URL here!(Maybe take it from the video itself)
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/aparkar44/demo-java.git']])
+            }
+        }
+        stage('Maven Build and copy war file'){
+            steps {
+            sh '''mvn clean package 
+		// Give desired filename to .war for renaming(can also leave it as default)
+                  mv target/*.war target/parkar.war
+                  '''
+            }
+        }
+        stage('Move File to Tomcat Server'){
+            steps{
+                sshagent(['tomcat-credentials']){
+                    sh """
+		    //Extremely important please change username and ip address to your ec2instance.
+                    scp -o StrictHostKeyChecking=no target/parkar.war ubuntu@3.97.89.133:/tomcatdocker/docker/
+		    //Make sure tomcatdocker and docker directory exists before running this command.
+                    pwd
+                    """
+                }
+            }
+        }
+        stage('Create docker image and run container'){
+            agent {
+                label 'terraform'
+            }
+            steps{
+                dir('/tomcatdocker/docker'){
+                    sh '''
+                        docker build -t abraartomcatnew .
+                        docker run -d -p 8084:8080 abraartomcatnew
+                        
+                        '''
+                }
+            }
+        }
+    }
+}
